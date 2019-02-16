@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Decode Ogg Vorbis by WebAssembly</title>
+</head>
+<body>
+    <button disabled>Play</button>
+    <script>
+        "use strict";
+
+        (async () => {
+            // WebAssembly
+            const memory = new WebAssembly.Memory({ initial: 20 });
+            const imports = { env: { memory } };
+            /** @type {{alloc: (size: number) => number, dealloc: (ptr: number, size: number) => void, decode_vorbis: (ptr: number, size: number, p_wav_size: number) => number }} */
+            const exports = await (async () => {
+                const target = "target/wasm32-unknown-unknown/debug/wasm_test.wasm";
+                const response = await fetch(target);
+                const buffer = await response.arrayBuffer();
+                const { module, instance } = await WebAssembly.instantiate(buffer, imports);
+                return instance.exports;
+            })();
+
+            // Input Ogg Vorbis Buffer
+            const input = await (async () => {
+                const target = "sample.ogg";
+                const response = await fetch(target);
+                return response.arrayBuffer();
+            })();
+
+            // Output Wave Buffer
+            const output = (() => {
+                const inputPtr = exports.alloc(input.byteLength);
+                new Uint8Array(memory.buffer).set(new Uint8Array(input), inputPtr);
+
+                const outputSizePtr = exports.alloc(4); // *mut usize
+                const outputPtr = exports.decode_vorbis(inputPtr, input.byteLength, outputSizePtr);
+
+                const outputSize = new DataView(memory.buffer).getInt32(outputSizePtr, true);
+                const output = memory.buffer.slice(outputPtr, outputPtr + outputSize);
+
+                // free
+                exports.dealloc(outputPtr, outputSize);
+                exports.dealloc(outputSizePtr, 4);
+                exports.dealloc(inputPtr, input.byteLength);
+
+                return output;
+            })();
+
+            // Web Audio API
+            const ctx = new AudioContext();
+            const audioBuffer = await ctx.decodeAudioData(output);
+            const sourceNode = new AudioBufferSourceNode(ctx);
+            sourceNode.buffer = audioBuffer;
+            sourceNode.connect(ctx.destination);
+
+            // DOM
+            const $button = document.querySelector("button");
+            $button.addEventListener("click", async () => {
+                if (ctx.state === "suspended") {
+                    await ctx.resume();
+                }
+                sourceNode.start();
+            });
+            $button.disabled = false;
+        })();
+    </script>
+</body>
+</html>
