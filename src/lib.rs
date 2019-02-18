@@ -1,9 +1,5 @@
 #![warn(clippy::all)]
 
-#![feature(link_args)]
-#![allow(unused_attributes)]
-#![link_args = "--import-memory"]
-
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
