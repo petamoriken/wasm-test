@@ -3,30 +3,30 @@
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-pub mod __memory {
+pub mod memory {
     use std::{mem, alloc as std_alloc};
 
     #[no_mangle]
-    pub unsafe extern "C" fn alloc(size: usize) -> *mut u8 {
+    pub unsafe extern fn alloc(size: usize) -> *mut u8 {
         let layout = std_alloc::Layout::from_size_align(size, mem::align_of::<usize>()).unwrap();
         std_alloc::alloc(layout)
     }
 
     #[no_mangle]
-    pub unsafe extern "C" fn dealloc(ptr: *mut u8, size: usize) {
+    pub unsafe extern fn dealloc(ptr: *mut u8, size: usize) {
         if size == 0 { return }
         let layout = std_alloc::Layout::from_size_align_unchecked(size, mem::align_of::<usize>());
         std_alloc::dealloc(ptr, layout)
     }
 }
 
-pub mod __vorbis {
+pub mod vorbis {
     use std::{slice, boxed::Box, io::Cursor};
     use lewton::inside_ogg::OggStreamReader;
     use hound::{WavWriter, WavSpec, SampleFormat};
 
     #[no_mangle]
-    pub unsafe extern "C" fn decode_vorbis(ptr: *const u8, size: usize, p_wav_size: *mut usize) -> *mut u8 {
+    pub unsafe extern fn decode_vorbis(ptr: *const u8, size: usize, p_wav_size: *mut usize) -> *mut u8 {
         let input = slice::from_raw_parts(ptr, size);
         let mut output = Cursor::new(Vec::new());
 
